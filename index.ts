@@ -15,42 +15,122 @@ import net = require('net');
 import path = require('path');
 var colors = require('colors');
 
+class MapFileEntry {
+	constructor(public domain:string, public jsfile:string) {
+	}
+
+	toString() {
+		return this.domain + ',' + this.jsfile;
+	}
+}
+
 class MapFile {
+	private entries: MapFileEntry[] = [];
+
+	constructor() {
+	}
+
 	private getUserHome() {
 		//return process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE;
 		return process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
 	}
 
-	private getMapFilePath() {
+	getMapFilePath() {
 		return this.getUserHome() + '/.node-tspm';
 	}
 
-	ensureExists() {
+	private ensureExists() {
 		var path = this.getMapFilePath();
 		if (!fs.existsSync(path)) {
 			fs.writeFileSync(path, '', 'utf8');
 		}
 	}
 
-	list() {
+	load() {
+		this.ensureExists();
 		var contents = fs.readFileSync(this.getMapFilePath(), 'utf8');
-		if (!contents.length) {
-			contents = 'file is empty';
-		}
-		console.log((contents)['green']);
+		this.entries = [];
+		contents.split("\n").forEach((line) => {
+			line = line.trim();
+			if (line.length) {
+				var parts = line.split(',');
+				var domain = parts[0];
+				var jsfile = parts[1];
+				this.entries.push(new MapFileEntry(domain, jsfile));
+			}
+		});
 	}
 
-	constructor() {
+	save() {
+		fs.writeFileSync(this.getMapFilePath(), this.entries.join("\n"), 'utf8');
+	}
+
+	list() {
+		if (!this.entries.length) {
+			console.log(('file is empty')['green']);
+		} else {
+			console.log('items:');
+			this.entries.forEach((entry) => {
+				console.log(String(entry)['green']);
+			});
+		}
+	}
+
+	set(domain: string, jsfile: string) {
+		var found = false;
+		this.entries.forEach((entry) => {
+			if (entry.domain == domain) {
+				entry.jsfile = jsfile;
+				found = true;
+			}
+		});
+		if (!found) {
+			this.entries.push(new MapFileEntry(domain, jsfile));
+		}
+	}
+
+	remove(domain: string) {
+		for (var n = 0; n < this.entries.length; n++) {
+			if (this.entries[n].domain == domain) {
+				this.entries.splice(n, 1);
+				return;
+			}
+		}
 	}
 }
 
 var mapFile = new MapFile();
-mapFile.ensureExists();
+mapFile.load();
 
 switch (process.argv[2]) {
 	case 'list':
 		mapFile.list();
 		process.exit(0);
+		break;
+	case 'set':
+		mapFile.set(process.argv[3], process.argv[4]);
+		mapFile.list();
+		mapFile.save();
+		process.exit(0);
+		break;
+	case 'remove':
+		mapFile.remove(process.argv[3]);
+		mapFile.list();
+		mapFile.save();
+		process.exit(0);
+		break;
+	case 'daemon':
+		var out = fs.openSync('./out.log', 'a');
+		var child = require('child_process').spawn(process.argv[0], ['--harmony', process.argv[1], 'server'], {
+			detached: true,
+			stdio: ['ignore', out, out]
+		});
+		child.unref();
+		console.log(process.pid + ' -> ' + child.pid);
+		return process.exit(0);
+
+		break;
+	case 'server':
 		break;
 	case 'help':
 	default:
@@ -58,24 +138,14 @@ switch (process.argv[2]) {
 		console.log('- tspm list');
 		console.log('- tspm set <domain> <path_to_js>');
 		console.log('- tspm remove <domain>');
+		console.log('- tspm server');
+		console.log('- tspm daemon');
 		process.exit(-1);
 		break;
 }
 
-console.log('os:' + os.platform());
+//console.log('os:' + os.platform());
 
-if (os.platform() !== 'win32') {
-	if (process.argv[2] != 'child') {
-		var out = fs.openSync('./out.log', 'a');
-		var child = require('child_process').spawn(process.argv[0], ['--harmony', process.argv[1], 'child'], {
-			detached: true,
-			stdio: ['ignore', out, out]
-		});
-		child.unref();
-		console.log(process.pid + ' -> ' + child.pid);
-		return process.exit(0);
-	}
-}
 
 //require('daemon')();
 
@@ -207,30 +277,46 @@ class Server {
 	listen(port: number) {
 		var proxy = httpProxy.createProxyServer({ ws: true });
 
+		proxy.on('error', (err) => {
+			console.error(err);
+		});
+
 		var getServiceByRequest = ((req: http.ServerRequest) => {
 			var host = req.headers.host;
 			return this.serviceByDomain[host];
 		});
 
 		var proxyServer = http.createServer((req, res) => {
-			var service = getServiceByRequest(req);
+			try {
+				var service = getServiceByRequest(req);
 
-			if (service) {
-				proxy.web(req, res, { target: 'http://127.0.0.1:' + service.port, ws: true });
-			} else {
-				res.writeHead(500, { 'Content-Type': 'text/plain' });
-				res.write('Invalid request');
-				res.end();
+				if (service) {
+					proxy.web(req, res, { target: 'http://127.0.0.1:' + service.port, ws: true });
+				} else {
+					res.writeHead(500, { 'Content-Type': 'text/plain' });
+					res.write('Invalid request');
+					res.end();
+				}
+			} catch (e) {
+				console.error(e);
 			}
 		});
 
-		proxyServer.on('upgrade', (req, socket, head) => {
-			var service = getServiceByRequest(req);
+		proxyServer.on('error', (err) => {
+			console.error(err);
+		});
 
-			if (service) {
-				proxy.ws(req, socket, { target: 'http://127.0.0.1:' + service.port, ws: true });
-			} else {
-				socket.close();
+		proxyServer.on('upgrade', (req, socket, head) => {
+			try {
+				var service = getServiceByRequest(req);
+
+				if (service) {
+					proxy.ws(req, socket, { target: 'http://127.0.0.1:' + service.port, ws: true });
+				} else {
+					socket.close();
+				}
+			} catch (e) {
+				console.error(e);
 			}
 		});
 
@@ -242,7 +328,7 @@ console.log('Main process: ' + process.pid);
 
 var port = process.env.PORT || 80;
 var server = new Server();
-server.watchMapFile(getMapFile());
+server.watchMapFile(mapFile.getMapFilePath());
 server.listen(port);
 console.log('listening at ' + port);
 

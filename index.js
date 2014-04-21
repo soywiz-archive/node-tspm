@@ -6,15 +6,27 @@ var httpProxy = require('http-proxy');
 var _ = require('underscore');
 
 var fs = require('fs');
-var os = require('os');
+
 var child_process = require('child_process');
 var http = require('http');
 var net = require('net');
 var path = require('path');
 var colors = require('colors');
 
+var MapFileEntry = (function () {
+    function MapFileEntry(domain, jsfile) {
+        this.domain = domain;
+        this.jsfile = jsfile;
+    }
+    MapFileEntry.prototype.toString = function () {
+        return this.domain + ',' + this.jsfile;
+    };
+    return MapFileEntry;
+})();
+
 var MapFile = (function () {
     function MapFile() {
+        this.entries = [];
     }
     MapFile.prototype.getUserHome = function () {
         //return process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE;
@@ -32,23 +44,93 @@ var MapFile = (function () {
         }
     };
 
-    MapFile.prototype.list = function () {
+    MapFile.prototype.load = function () {
+        var _this = this;
+        this.ensureExists();
         var contents = fs.readFileSync(this.getMapFilePath(), 'utf8');
-        if (!contents.length) {
-            contents = 'file is empty';
+        this.entries = [];
+        contents.split("\n").forEach(function (line) {
+            line = line.trim();
+            if (line.length) {
+                var parts = line.split(',');
+                var domain = parts[0];
+                var jsfile = parts[1];
+                _this.entries.push(new MapFileEntry(domain, jsfile));
+            }
+        });
+    };
+
+    MapFile.prototype.save = function () {
+        fs.writeFileSync(this.getMapFilePath(), this.entries.join("\n"), 'utf8');
+    };
+
+    MapFile.prototype.list = function () {
+        if (!this.entries.length) {
+            console.log(('file is empty')['green']);
+        } else {
+            console.log('items:');
+            this.entries.forEach(function (entry) {
+                console.log(String(entry)['green']);
+            });
         }
-        console.log((contents)['green']);
+    };
+
+    MapFile.prototype.set = function (domain, jsfile) {
+        var found = false;
+        this.entries.forEach(function (entry) {
+            if (entry.domain == domain) {
+                entry.jsfile = jsfile;
+                found = true;
+            }
+        });
+        if (!found) {
+            this.entries.push(new MapFileEntry(domain, jsfile));
+        }
+    };
+
+    MapFile.prototype.remove = function (domain) {
+        for (var n = 0; n < this.entries.length; n++) {
+            if (this.entries[n].domain == domain) {
+                this.entries.splice(n, 1);
+                return;
+            }
+        }
     };
     return MapFile;
 })();
 
 var mapFile = new MapFile();
-mapFile.ensureExists();
+mapFile.load();
 
 switch (process.argv[2]) {
     case 'list':
         mapFile.list();
         process.exit(0);
+        break;
+    case 'set':
+        mapFile.set(process.argv[3], process.argv[4]);
+        mapFile.list();
+        mapFile.save();
+        process.exit(0);
+        break;
+    case 'remove':
+        mapFile.remove(process.argv[3]);
+        mapFile.list();
+        mapFile.save();
+        process.exit(0);
+        break;
+    case 'daemon':
+        var out = fs.openSync('./out.log', 'a');
+        var child = require('child_process').spawn(process.argv[0], ['--harmony', process.argv[1], 'server'], {
+            detached: true,
+            stdio: ['ignore', out, out]
+        });
+        child.unref();
+        console.log(process.pid + ' -> ' + child.pid);
+        return process.exit(0);
+
+        break;
+    case 'server':
         break;
     case 'help':
     default:
@@ -56,25 +138,13 @@ switch (process.argv[2]) {
         console.log('- tspm list');
         console.log('- tspm set <domain> <path_to_js>');
         console.log('- tspm remove <domain>');
+        console.log('- tspm server');
+        console.log('- tspm daemon');
         process.exit(-1);
         break;
 }
 
-console.log('os:' + os.platform());
-
-if (os.platform() !== 'win32') {
-    if (process.argv[2] != 'child') {
-        var out = fs.openSync('./out.log', 'a');
-        var child = require('child_process').spawn(process.argv[0], ['--harmony', process.argv[1], 'child'], {
-            detached: true,
-            stdio: ['ignore', out, out]
-        });
-        child.unref();
-        console.log(process.pid + ' -> ' + child.pid);
-        return process.exit(0);
-    }
-}
-
+//console.log('os:' + os.platform());
 //require('daemon')();
 //console.log(process.pid);
 //console.log('bbbbb');
@@ -209,30 +279,46 @@ var Server = (function () {
         var _this = this;
         var proxy = httpProxy.createProxyServer({ ws: true });
 
+        proxy.on('error', function (err) {
+            console.error(err);
+        });
+
         var getServiceByRequest = (function (req) {
             var host = req.headers.host;
             return _this.serviceByDomain[host];
         });
 
         var proxyServer = http.createServer(function (req, res) {
-            var service = getServiceByRequest(req);
+            try  {
+                var service = getServiceByRequest(req);
 
-            if (service) {
-                proxy.web(req, res, { target: 'http://127.0.0.1:' + service.port, ws: true });
-            } else {
-                res.writeHead(500, { 'Content-Type': 'text/plain' });
-                res.write('Invalid request');
-                res.end();
+                if (service) {
+                    proxy.web(req, res, { target: 'http://127.0.0.1:' + service.port, ws: true });
+                } else {
+                    res.writeHead(500, { 'Content-Type': 'text/plain' });
+                    res.write('Invalid request');
+                    res.end();
+                }
+            } catch (e) {
+                console.error(e);
             }
         });
 
-        proxyServer.on('upgrade', function (req, socket, head) {
-            var service = getServiceByRequest(req);
+        proxyServer.on('error', function (err) {
+            console.error(err);
+        });
 
-            if (service) {
-                proxy.ws(req, socket, { target: 'http://127.0.0.1:' + service.port, ws: true });
-            } else {
-                socket.close();
+        proxyServer.on('upgrade', function (req, socket, head) {
+            try  {
+                var service = getServiceByRequest(req);
+
+                if (service) {
+                    proxy.ws(req, socket, { target: 'http://127.0.0.1:' + service.port, ws: true });
+                } else {
+                    socket.close();
+                }
+            } catch (e) {
+                console.error(e);
             }
         });
 
@@ -245,6 +331,6 @@ console.log('Main process: ' + process.pid);
 
 var port = process.env.PORT || 80;
 var server = new Server();
-server.watchMapFile(getMapFile());
+server.watchMapFile(mapFile.getMapFilePath());
 server.listen(port);
 console.log('listening at ' + port);
