@@ -1,5 +1,6 @@
 ///<reference path="typings/node/node.d.ts" />
 ///<reference path="typings/tspromise/tspromise.d.ts" />
+///<reference path="typings/redis/redis.d.ts" />
 
 var Promise = require('tspromise');
 var httpProxy = require('http-proxy');
@@ -11,7 +12,20 @@ var child_process = require('child_process');
 var http = require('http');
 var net = require('net');
 var path = require('path');
+var redis = require('redis');
 var colors = require('colors');
+
+var redisSubClient = redis.createClient();
+redisSubClient.on('message', function (channel, message) {
+    console.log(channel + ':' + message);
+});
+redisSubClient.subscribe('tspm');
+
+var redisClient = redis.createClient();
+redisClient.hset('tspm_map', 'sample', 'value');
+redisClient.hgetall('tspm_map', function (err, result) {
+    console.log(result);
+});
 
 var MapFileEntry = (function () {
     function MapFileEntry(domain, jsfile) {
@@ -105,7 +119,9 @@ mapFile.load();
 switch (process.argv[2]) {
     case 'list':
         mapFile.list();
-        process.exit(0);
+
+        //process.exit(0);
+        return;
         break;
     case 'set':
         mapFile.set(process.argv[3], process.argv[4]);
@@ -292,7 +308,7 @@ var Server = (function () {
         var proxy = httpProxy.createProxyServer({ ws: true });
 
         proxy.on('error', function (err) {
-            console.error(err);
+            console.error(String(err)['red']);
         });
 
         var getServiceByRequest = (function (req) {
@@ -312,12 +328,12 @@ var Server = (function () {
                     res.end();
                 }
             } catch (e) {
-                console.error(e);
+                console.error(String(e)['red']);
             }
         });
 
         proxyServer.on('error', function (err) {
-            console.error(err);
+            console.error(String(err)['red']);
         });
 
         proxyServer.on('upgrade', function (req, socket, head) {
@@ -330,7 +346,7 @@ var Server = (function () {
                     socket.close();
                 }
             } catch (e) {
-                console.error(e);
+                console.error(String(e)['red']);
             }
         });
 
@@ -346,3 +362,4 @@ var server = new Server();
 server.watchMapFile(mapFile.getMapFilePath());
 server.listen(port);
 console.log('listening at ' + port);
+//# sourceMappingURL=index.js.map

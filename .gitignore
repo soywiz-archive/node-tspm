@@ -2,3 +2,6 @@
 /err.log
 /map.txt
 /node_modules
+/*.user
+/obj
+/*.suo

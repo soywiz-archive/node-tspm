@@ -1,5 +1,6 @@
 ///<reference path="typings/node/node.d.ts" />
 ///<reference path="typings/tspromise/tspromise.d.ts" />
+///<reference path="typings/redis/redis.d.ts" />
 
 declare function require(name: string): any;
 
@@ -13,7 +14,20 @@ import child_process = require('child_process');
 import http = require('http');
 import net = require('net');
 import path = require('path');
+import redis = require('redis');
 var colors = require('colors');
+
+var redisSubClient = redis.createClient();
+redisSubClient.on('message', (channel, message) => {
+	console.log(channel + ':' + message);
+});
+redisSubClient.subscribe('tspm');
+
+var redisClient = redis.createClient();
+redisClient.hset('tspm_map', 'sample', 'value');
+redisClient.hgetall('tspm_map', (err, result) => {
+	console.log(result);
+});
 
 class MapFileEntry {
 	constructor(public domain:string, public jsfile:string) {
@@ -105,7 +119,8 @@ mapFile.load();
 switch (process.argv[2]) {
 	case 'list':
 		mapFile.list();
-		process.exit(0);
+		//process.exit(0);
+		return;
 		break;
 	case 'set':
 		mapFile.set(process.argv[3], process.argv[4]);
@@ -288,7 +303,7 @@ class Server {
 		var proxy = httpProxy.createProxyServer({ ws: true });
 
 		proxy.on('error', (err) => {
-			console.error(err);
+			console.error(String(err)['red']);
 		});
 
 		var getServiceByRequest = ((req: http.ServerRequest) => {
@@ -308,12 +323,12 @@ class Server {
 					res.end();
 				}
 			} catch (e) {
-				console.error(e);
+				console.error(String(e)['red']);
 			}
 		});
 
 		proxyServer.on('error', (err) => {
-			console.error(err);
+			console.error(String(err)['red']);
 		});
 
 		proxyServer.on('upgrade', (req, socket, head) => {
@@ -326,7 +341,7 @@ class Server {
 					socket.close();
 				}
 			} catch (e) {
-				console.error(e);
+				console.error(String(e)['red']);
 			}
 		});
 
@@ -341,4 +356,3 @@ var server = new Server();
 server.watchMapFile(mapFile.getMapFilePath());
 server.listen(port);
 console.log('listening at ' + port);
-
