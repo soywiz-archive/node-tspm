@@ -13,6 +13,53 @@ var net = require('net');
 var path = require('path');
 var colors = require('colors');
 
+var MapFile = (function () {
+    function MapFile() {
+    }
+    MapFile.prototype.getUserHome = function () {
+        //return process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE;
+        return process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
+    };
+
+    MapFile.prototype.getMapFilePath = function () {
+        return this.getUserHome() + '/.node-tspm';
+    };
+
+    MapFile.prototype.ensureExists = function () {
+        var path = this.getMapFilePath();
+        if (!fs.existsSync(path)) {
+            fs.writeFileSync(path, '', 'utf8');
+        }
+    };
+
+    MapFile.prototype.list = function () {
+        var contents = fs.readFileSync(this.getMapFilePath(), 'utf8');
+        if (!contents.length) {
+            contents = 'file is empty';
+        }
+        console.log((contents)['green']);
+    };
+    return MapFile;
+})();
+
+var mapFile = new MapFile();
+mapFile.ensureExists();
+
+switch (process.argv[2]) {
+    case 'list':
+        mapFile.list();
+        process.exit(0);
+        break;
+    case 'help':
+    default:
+        console.log('tspm:');
+        console.log('- tspm list');
+        console.log('- tspm set <domain> <path_to_js>');
+        console.log('- tspm remove <domain>');
+        process.exit(-1);
+        break;
+}
+
 console.log('os:' + os.platform());
 
 if (os.platform() !== 'win32') {
@@ -198,6 +245,6 @@ console.log('Main process: ' + process.pid);
 
 var port = process.env.PORT || 80;
 var server = new Server();
-server.watchMapFile(__dirname + '/map.txt');
+server.watchMapFile(getMapFile());
 server.listen(port);
 console.log('listening at ' + port);
