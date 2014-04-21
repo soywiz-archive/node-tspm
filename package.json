@@ -1,28 +1,32 @@
 {
-  "name": "tspm",
-  "description": "A Node reverse-proxy http server daemon that spawns process in a map",
-  "version": "0.0.1",
-  "author": "Carlos Ballesteros <cballesterosvelasco@gmail.com> (http://cballesterosvelasco.es/)",
-  "contributors": [ 
-  ],
-  "dependencies": {
-	"tspromise": "0.0.4",
-	"underscore": "1.6.0",
-	"http-proxy": "1.1.2"
-  },
-  "devDependencies": {
-  },
-  "homepage": "https://github.com/soywiz/node-tspm",
-  "keywords": ["proxy", "http", "server"],
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/soywiz/node-tspm.git"
-  },
-  "main": "Promise.js",
-  "scripts": {
-  },
-  "license": "MIT",
-  "engines": {
-    "node": "*"
-  }
+	"name": "tspm",
+	"description": "A Node reverse-proxy http server daemon that spawns process in a map",
+	"version": "0.0.1",
+	"author": "Carlos Ballesteros <cballesterosvelasco@gmail.com> (http://cballesterosvelasco.es/)",
+	"contributors": [ 
+	],
+	"dependencies": {
+		"tspromise": "0.0.4",
+		"underscore": "1.6.0",
+		"http-proxy": "1.1.2"
+	},
+	"devDependencies": {
+	},
+	"homepage": "https://github.com/soywiz/node-tspm",
+	"keywords": ["proxy", "http", "server"],
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/soywiz/node-tspm.git"
+	},
+	"preferGlobal" : true,
+	"main": "index.js",
+	"bin" : { 
+		"tspm" : "./bin/tspm" 
+	},
+	"scripts": {
+	},
+	"license": "MIT",
+	"engines": {
+	"node": "*"
+	}
 }

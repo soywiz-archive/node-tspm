@@ -144,6 +144,16 @@ switch (process.argv[2]) {
         break;
 }
 
+process.on('SIGTERM', function () {
+    console.log('Got SIGTERM.  Press Control-D to exit.');
+    process.exit(0);
+});
+
+process.on('SIGINT', function () {
+    console.log('Got SIGINT.  Press Control-D to exit.');
+    process.exit(0);
+});
+
 //console.log('os:' + os.platform());
 //require('daemon')();
 //console.log(process.pid);
@@ -210,10 +220,12 @@ var Service = (function () {
         });
 
         this.child.on('exit', function (code, signal) {
-            console.log('exit:' + code + ',' + signal + ': restarting in one second');
+            var timems = 5000;
+
+            console.log('exit:' + code + ',' + signal + ': restarting in ' + timems + ' milliseconds');
             setTimeout(function () {
                 _this.restart();
-            }, 5000);
+            }, timems);
         });
 
         this.child.on('error', function (err) {
