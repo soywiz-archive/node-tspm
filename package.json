@@ -1,15 +1,15 @@
 {
 	"name": "tspm",
 	"description": "A Node reverse-proxy http server daemon that spawns process in a map",
-	"version": "0.0.5",
+	"version": "0.0.7",
 	"author": "Carlos Ballesteros <cballesterosvelasco@gmail.com> (http://cballesterosvelasco.es/)",
 	"contributors": [ 
 	],
 	"dependencies": {
-		"tspromise": "0.0.4",
+		"tspromise": "0.0.5",
 		"underscore": "1.6.0",
-		"http-proxy": "1.1.2",
-		"redis": "0.10.1",
+		"http-proxy": "1.1.4",
+		"redis": "0.10.3",
 		"colors": "0.6.2"
 	},
 	"devDependencies": {

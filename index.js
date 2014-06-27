@@ -280,7 +280,7 @@ var Service = (function () {
         });
 
         this.child.on('error', function (err) {
-            console.log(('error:' + err)['red']);
+            console.log(('child.error:' + err)['red']);
         });
     };
     return Service;
@@ -343,7 +343,7 @@ var Server = (function () {
         var proxy = httpProxy.createProxyServer({ ws: true });
 
         proxy.on('error', function (err) {
-            console.error(String(err)['red']);
+            console.error(('proxy.error:' + err)['red']);
         });
 
         var getServiceByRequest = (function (req) {
@@ -359,16 +359,16 @@ var Server = (function () {
                     proxy.web(req, res, { target: 'http://127.0.0.1:' + service.port, ws: true });
                 } else {
                     res.writeHead(500, { 'Content-Type': 'text/plain' });
-                    res.write('Invalid request');
+                    res.write('Invalid request for domain "' + req.headers.host + '"');
                     res.end();
                 }
             } catch (e) {
-                console.error(String(e)['red']);
+                console.error(('proxyServer.catch:' + e)['red']);
             }
         });
 
         proxyServer.on('error', function (err) {
-            console.error(String(err)['red']);
+            console.error(('proxyServer.error: ' + err)['red']);
         });
 
         proxyServer.on('upgrade', function (req, socket, head) {
@@ -381,7 +381,7 @@ var Server = (function () {
                     socket.close();
                 }
             } catch (e) {
-                console.error(String(e)['red']);
+                console.error(('proxyServer.upgrade.catch:' + e)['red']);
             }
         });
 
