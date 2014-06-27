@@ -5,3 +5,5 @@
 /*.user
 /obj
 /*.suo
+/tspm_daemon.log
+/*.pid

@@ -14,9 +14,10 @@ import child_process = require('child_process');
 import http = require('http');
 import net = require('net');
 import path = require('path');
-import redis = require('redis');
 var colors = require('colors');
 
+/*
+import redis = require('redis');
 var redisSubClient = redis.createClient();
 redisSubClient.on('message', (channel, message) => {
 	console.log(channel + ':' + message);
@@ -28,6 +29,7 @@ redisClient.hset('tspm_map', 'sample', 'value');
 redisClient.hgetall('tspm_map', (err, result) => {
 	console.log(result);
 });
+*/
 
 class MapFileEntry {
 	constructor(public domain:string, public jsfile:string) {
@@ -116,6 +118,9 @@ class MapFile {
 var mapFile = new MapFile();
 mapFile.load();
 
+var pid_file = __dirname + '/tspm_daemon.pid';
+var log_file = __dirname + '/tspm_daemon.log';
+
 switch (process.argv[2]) {
 	case 'list':
 		mapFile.list();
@@ -135,15 +140,23 @@ switch (process.argv[2]) {
 		process.exit(0);
 		break;
 	case 'daemon':
-		var out = fs.openSync('./out.log', 'a');
+		var out = fs.openSync(log_file, 'a');
 		var child = require('child_process').spawn(process.argv[0], ['--harmony', process.argv[1], 'server'], {
 			detached: true,
 			stdio: ['ignore', out, out]
 		});
 		child.unref();
+		fs.writeFileSync(pid_file, '' + child.pid);
 		console.log(process.pid + ' -> ' + child.pid);
 		return process.exit(0);
 
+		break;
+	case 'daemon_stop':
+		if (fs.existsSync(pid_file)) {
+			process.kill(parseInt(<string><any>(fs.readFileSync(pid_file, { encoding: 'utf8' }))), 'SIGTERM');
+			fs.unlinkSync(pid_file);
+		}
+		return process.exit(0);
 		break;
 	case 'server':
 		break;
@@ -155,6 +168,7 @@ switch (process.argv[2]) {
 		console.log('- tspm remove <domain>');
 		console.log('- tspm server');
 		console.log('- tspm daemon');
+		console.log('- tspm daemon_stop');
 		process.exit(-1);
 		break;
 }
