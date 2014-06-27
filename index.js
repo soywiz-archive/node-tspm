@@ -119,6 +119,16 @@ mapFile.load();
 var pid_file = __dirname + '/tspm_daemon.pid';
 var log_file = __dirname + '/tspm_daemon.log';
 
+process.on('SIGTERM', function () {
+    console.log('Got SIGTERM.  Press Control-D to exit.');
+    process.exit(0);
+});
+
+process.on('SIGINT', function () {
+    console.log('Got SIGINT.  Press Control-D to exit.');
+    process.exit(0);
+});
+
 switch (process.argv[2]) {
     case 'list':
         mapFile.list();
@@ -157,6 +167,28 @@ switch (process.argv[2]) {
         }
         return process.exit(0);
         break;
+    case 'log':
+        console.log('log: ' + log_file);
+
+        var ls = child_process.spawn('tail', ['-f', log_file]);
+
+        //var ls = child_process.spawn('type', [log_file]);
+        ls.stdout.on('data', function (data) {
+            process.stdout.write(data);
+        });
+
+        ls.stderr.on('data', function (data) {
+            process.stderr.write(data);
+        });
+
+        ls.on('close', function (code) {
+            console.log('child process exited with code ' + code);
+            process.exit(code);
+        });
+
+        return;
+
+        break;
     case 'server':
         break;
     case 'help':
@@ -168,19 +200,10 @@ switch (process.argv[2]) {
         console.log('- tspm server');
         console.log('- tspm daemon');
         console.log('- tspm daemon_stop');
+        console.log('- tspm log');
         process.exit(-1);
         break;
 }
-
-process.on('SIGTERM', function () {
-    console.log('Got SIGTERM.  Press Control-D to exit.');
-    process.exit(0);
-});
-
-process.on('SIGINT', function () {
-    console.log('Got SIGINT.  Press Control-D to exit.');
-    process.exit(0);
-});
 
 //console.log('os:' + os.platform());
 //require('daemon')();
