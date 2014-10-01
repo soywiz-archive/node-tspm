@@ -384,7 +384,7 @@ class Server {
 			}
 		});
 
-		proxyServer.listen(port);
+		proxyServer.listen(port, '127.0.0.1');
 	}
 }
 

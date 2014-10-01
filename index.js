@@ -385,7 +385,7 @@ var Server = (function () {
             }
         });
 
-        proxyServer.listen(port);
+        proxyServer.listen(port, '127.0.0.1');
     };
     return Server;
 })();
