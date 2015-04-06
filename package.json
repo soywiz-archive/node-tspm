@@ -1,7 +1,7 @@
 {
 	"name": "tspm",
 	"description": "A Node reverse-proxy http server daemon that spawns process in a map",
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"author": "Carlos Ballesteros <cballesterosvelasco@gmail.com> (http://cballesterosvelasco.es/)",
 	"contributors": [ 
 	],
