@@ -136,6 +136,7 @@ class Service {
     private path:string;
     private _port:number;
     private child:child_process.ChildProcess;
+    private monitoring:boolean = false;
 
     constructor(private domain:string) {
     }
@@ -161,30 +162,34 @@ class Service {
     restart() {
         if (this.child) this.child.kill();
 
-        this.child = child_process.spawn(this.cmd, this.args, {
-            cwd: this.path,
-            env: _.extend({}, process.env, {PORT: this._port})
-            //stdio: ['ignore', 'ignore', 'ignore']
-        });
+        if (!this.monitoring) {
+            this.monitoring = true;
 
-        console.log(('started ' + this.domain + ':' + this.port + ', process: ' + this.child.pid)['cyan']);
+            this.child = child_process.spawn(this.cmd, this.args, {
+                cwd: this.path,
+                env: _.extend({}, process.env, {PORT: this._port})
+                //stdio: ['ignore', 'ignore', 'ignore']
+            });
 
-        this.child.stdout.on('data', (m) => {
-            process.stdout.write(('[' + this.domain + ']:' + m.toString('utf8'))['green']);
-        });
+            console.log(('started ' + this.domain + ':' + this.port + ', process: ' + this.child.pid)['cyan']);
 
-        this.child.on('exit', (code, signal) => {
-            var timems = 5000;
+            this.child.stdout.on('data', (m) => {
+                process.stdout.write(('[' + this.domain + ']:' + m.toString('utf8'))['green']);
+            });
 
-            console.log('exit:' + code + ',' + signal + ': restarting in ' + timems + ' milliseconds');
-            setTimeout(() => {
-                this.restart();
-            }, timems)
-        });
+            this.child.on('exit', (code, signal) => {
+                var timems = 5000;
 
-        this.child.on('error', (err) => {
-            console.log(('child.error:' + err)['red']);
-        });
+                console.log('exit:' + code + ',' + signal + ': restarting in ' + timems + ' milliseconds');
+                setTimeout(() => {
+                    this.restart();
+                }, timems)
+            });
+
+            this.child.on('error', (err) => {
+                console.log(('child.error:' + err)['red']);
+            });
+        }
     }
 
     // { PORT: port }

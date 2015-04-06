@@ -107,6 +107,7 @@ function getAvailablePortAsync(bindAddress) {
 var Service = (function () {
     function Service(domain) {
         this.domain = domain;
+        this.monitoring = false;
     }
     Service.prototype.setParameters = function (cmd, args, path, port) {
         if (this.cmd === cmd)
@@ -134,24 +135,27 @@ var Service = (function () {
         var _this = this;
         if (this.child)
             this.child.kill();
-        this.child = child_process.spawn(this.cmd, this.args, {
-            cwd: this.path,
-            env: _.extend({}, process.env, { PORT: this._port })
-        });
-        console.log(('started ' + this.domain + ':' + this.port + ', process: ' + this.child.pid)['cyan']);
-        this.child.stdout.on('data', function (m) {
-            process.stdout.write(('[' + _this.domain + ']:' + m.toString('utf8'))['green']);
-        });
-        this.child.on('exit', function (code, signal) {
-            var timems = 5000;
-            console.log('exit:' + code + ',' + signal + ': restarting in ' + timems + ' milliseconds');
-            setTimeout(function () {
-                _this.restart();
-            }, timems);
-        });
-        this.child.on('error', function (err) {
-            console.log(('child.error:' + err)['red']);
-        });
+        if (!this.monitoring) {
+            this.monitoring = true;
+            this.child = child_process.spawn(this.cmd, this.args, {
+                cwd: this.path,
+                env: _.extend({}, process.env, { PORT: this._port })
+            });
+            console.log(('started ' + this.domain + ':' + this.port + ', process: ' + this.child.pid)['cyan']);
+            this.child.stdout.on('data', function (m) {
+                process.stdout.write(('[' + _this.domain + ']:' + m.toString('utf8'))['green']);
+            });
+            this.child.on('exit', function (code, signal) {
+                var timems = 5000;
+                console.log('exit:' + code + ',' + signal + ': restarting in ' + timems + ' milliseconds');
+                setTimeout(function () {
+                    _this.restart();
+                }, timems);
+            });
+            this.child.on('error', function (err) {
+                console.log(('child.error:' + err)['red']);
+            });
+        }
     };
     return Service;
 })();
